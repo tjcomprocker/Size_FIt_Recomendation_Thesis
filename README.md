@@ -25,6 +25,23 @@ For cleaning the dataset and dividing it into training,validation and testing se
 
 For persona analysis of user to see if single user buys product from same vertical for other persons.
 
+-------
+
+### Method-1
+
+Clustering (Brand,Size)s with Random Walk with Restart(RWR).
+
+-------
+
+### Method-2
+
+Clustering (Brand,Size)s with standard community detection algorithms(Fastgreedy,Infomap and Walktrap).
+
+------
+
+### Method-3
+
+Clustering (Brand,Size)s with standard community detection algorithms(Fastgreedy,Infomap and Walktrap). Than compress those clusters with Random Walk with Restart(RWR).
 
 -------
 
