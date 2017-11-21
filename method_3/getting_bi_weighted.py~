@@ -1,0 +1,66 @@
+import pickle
+import networkx as nx
+import pandas as pd
+import numpy as np
+import random
+import sys
+import subprocess
+import os
+
+verticals = ["womenjean"]
+#verticals = ["womenbellies"]
+
+
+
+for vertical in verticals:
+	print vertical
+
+	name = "../"+vertical+"/sales/"+vertical+"_sales_training"
+	
+	G=nx.Graph()
+
+	if vertical == "womenbellies" or vertical == "mencasualshoes":
+		size_column_name = 'uk_india_size'
+	else:
+		size_column_name = 'size'
+
+	chunksize = 10 ** 3
+	for df in pd.read_csv(name+".csv", sep="\t",chunksize=chunksize):
+		for index,rows in df.iterrows():
+			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+				continue
+
+			if not (G.has_edge(rows['account_id'],str((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()))):
+				G.add_edge(rows['account_id'],(str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower(),weight=1)
+			else:
+				G[rows['account_id']][(str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()]['weight'] += 1
+
+	pickle.dump(G, open(name[:-9]+'_bi_weighted.pickle', 'wb'))
+
+	print len(G.nodes())
+
+	print "sales done....!!!!"
+	
+	G=nx.Graph()
+	print len(G.nodes())
+	
+	name = "../"+vertical+"/returns/"+vertical+"_returns_training"
+
+	if vertical == "womenbellies" or vertical == "mencasualshoes":
+		size_column_name = 'uk_india_size'
+	else:
+		size_column_name = 'size'
+
+	chunksize = 10 ** 3
+	for df in pd.read_csv(name+".csv", sep="\t",chunksize=chunksize):
+		for index,rows in df.iterrows():
+			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+				continue
+
+			if not (G.has_edge(rows['account_id'],str((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()))):
+				G.add_edge(rows['account_id'],(str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower(),weight=1)
+			else:
+				G[rows['account_id']][(str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()]['weight'] += 1
+	
+	pickle.dump(G, open(name[:-9]+'_bi_weighted.pickle', 'wb'))
+	print len(G.nodes())

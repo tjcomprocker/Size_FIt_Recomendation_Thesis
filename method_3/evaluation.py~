@@ -1,0 +1,401 @@
+import pickle
+import networkx as nx
+import pandas as pd
+import numpy as np
+import random
+import sys
+import subprocess
+import os
+from sklearn import svm
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import f1_score
+from sklearn.metrics import accuracy_score
+
+verticals = ["womenjean","mencasualshirt"]
+
+for vertical in verticals:
+	print vertical
+
+	if vertical == "womenbellies" or vertical == "mencasualshoes":
+		size_column_name = 'uk_india_size'
+	else:
+		size_column_name = 'size'
+
+	sales_validation_name = "../"+vertical+"/sales/"+vertical+"_sales_validation.csv"
+	returns_validation_name = "../"+vertical+"/returns/"+vertical+"_returns_validation.csv"
+
+	sales_testing_name = "../"+vertical+"/sales/"+vertical+"_sales_testing.csv"
+	returns_testing_name = "../"+vertical+"/returns/"+vertical+"_returns_testing.csv"
+
+	G_sales_bi_weighted = nx.Graph()
+	G_sales_bi_weighted = nx.read_gpickle("../"+vertical+"/sales/"+vertical+"_sales_bi_weighted.pickle")
+
+	G_returns_bi_weighted = nx.Graph()
+	G_returns_bi_weighted = nx.read_gpickle("../"+vertical+"/returns/"+vertical+"_returns_bi_weighted.pickle")	
+
+	cluster_sales = pickle.load(open("../"+vertical+"/sales/method_1/clusters.pickle","rb"))
+	cluster_returns = pickle.load(open("../"+vertical+"/returns/method_1/clusters.pickle","rb"))
+	sales_bs = list(pickle.load(open("../"+vertical+"/sales/"+vertical+"_sales_bs.pickle","rb")))
+	returns_bs = list(pickle.load(open("../"+vertical+"/returns/"+vertical+"_returns_bs.pickle","rb")))
+
+	predicted_sales = []
+	predicted_returns = []
+	predicted_combo = []
+	for_combo = []
+	for_combo2 = []
+	ground_truth_sales_method = []
+	ground_truth_returns_method = []
+	ground_truth_combo_method = []
+	
+	ground_truth_returns = []
+
+	chunksize = 10 ** 3
+	for df in pd.read_csv(returns_validation_name, sep="\t",chunksize=chunksize):
+		for index,rows in df.iterrows():
+			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+				continue
+			ground_truth_returns.append((rows['order_item_id'],rows['brand'],rows['account_id'],rows[size_column_name]))
+
+	chunksize = 10 ** 3
+	for df in pd.read_csv(sales_validation_name, sep="\t",chunksize=chunksize):
+		for index,rows in df.iterrows():
+			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+				continue
+
+			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in sales_bs and sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_sales.keys() :
+				clus = list(cluster_sales[sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower())])
+			else:
+				continue
+
+			if G_sales_bi_weighted.has_node(str(rows['account_id'])):
+				purchases  = G_sales_bi_weighted[rows['account_id']]
+			else:
+				continue
+			
+			if G_returns_bi_weighted.has_node(str(rows['account_id'])):
+				returns = G_returns_bi_weighted[rows['account_id']]
+				numerator = 0
+				denominator = 0
+				running_sum = 0
+				total_sold = 0
+				for items in clus:
+					if G_returns_bi_weighted.has_edge(str(rows['account_id']),sales_bs[items]):
+						numerator = G_returns_bi_weighted[str(rows['account_id'])][sales_bs[items]]['weight']
+						denominator = numerator
+					else:
+						numerator = 0
+					if G_sales_bi_weighted.has_edge(str(rows['account_id']),sales_bs[items]):
+						denominator = denominator + G_sales_bi_weighted[str(rows['account_id'])][sales_bs[items]]['weight']
+					elif denominator == 0:
+						continue
+					running_sum = float(running_sum) + ((float(numerator))/float(denominator))
+					total_sold = total_sold + 1
+				if total_sold > 0:
+					predicted_sales.append((float(running_sum))/float(total_sold))
+					for_combo.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+				else:
+					predicted_sales.append(0)
+					for_combo.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+			else:
+				predicted_sales.append(0)
+				for_combo.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+			
+			if (rows['order_id'],rows['brand'],rows['account_id'],rows[size_column_name]) in ground_truth_returns:
+				ground_truth_sales_method.append(1)
+			else:
+				ground_truth_sales_method.append(0)
+	
+	
+	
+	print "Sales Done....!!!!!"
+
+	chunksize = 10 ** 3
+	for df in pd.read_csv(sales_validation_name, sep="\t",chunksize=chunksize):
+		for index,rows in df.iterrows():
+			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+				continue
+
+			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in returns_bs and returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_returns.keys():
+				clus = list(cluster_returns[returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower())])
+			else:
+				continue
+
+			if G_sales_bi_weighted.has_node(str(rows['account_id'])):
+				purchases  = G_sales_bi_weighted[rows['account_id']]
+			else:
+				continue
+			
+			if G_returns_bi_weighted.has_node(str(rows['account_id'])):
+				returns = G_returns_bi_weighted[rows['account_id']]
+				numerator = 0
+				denominator = 0
+				running_sum = 0
+				total_sold = 0
+				for items in clus:
+					if G_returns_bi_weighted.has_edge(str(rows['account_id']),returns_bs[items]):
+						numerator = G_returns_bi_weighted[str(rows['account_id'])][returns_bs[items]]['weight']
+						denominator = numerator
+					else:
+						numerator = 0
+					if G_sales_bi_weighted.has_edge(str(rows['account_id']),returns_bs[items]):
+						denominator = denominator + G_sales_bi_weighted[str(rows['account_id'])][returns_bs[items]]['weight']
+					elif denominator == 0:
+						continue
+					running_sum = float(running_sum) + ((float(numerator))/float(denominator))
+					total_sold = total_sold + 1
+				if total_sold > 0:
+					predicted_returns.append((float(running_sum))/float(total_sold))
+					for_combo2.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+				else:
+					predicted_returns.append(0)
+					for_combo2.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+			else:
+				predicted_returns.append(0)
+				for_combo2.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+			
+			if (rows['order_id'],rows['brand'],rows['account_id'],rows[size_column_name]) in ground_truth_returns:
+				ground_truth_returns_method.append(1)
+			else:
+				ground_truth_returns_method.append(0)
+
+	chunksize = 10 ** 3
+	for df in pd.read_csv(sales_validation_name, sep="\t",chunksize=chunksize):
+		for index,rows in df.iterrows():
+			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+				continue
+			
+			temp_tuple = (str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id']))
+			if temp_tuple in for_combo and temp_tuple in for_combo2:
+				predicted_combo.append(list((predicted_sales[for_combo.index(temp_tuple)],predicted_returns[for_combo2.index(temp_tuple)])))
+				ground_truth_combo_method.append(ground_truth_sales_method[for_combo.index(temp_tuple)])
+
+	predicted_combo = np.array(predicted_combo)			
+	balanced2 = (np.where(np.array(ground_truth_combo_method) == 0)[0])
+	balanced3 = (np.where(np.array(ground_truth_combo_method) != 0)[0])
+	balanced4 = np.random.choice(balanced2,balanced3.size,replace=False)
+	balanced2 = np.concatenate([balanced3,balanced4])
+	balanced3 = list(np.take(np.array(ground_truth_combo_method), balanced2))
+	balanced4 = predicted_combo[balanced2[:,None],[0,1]]
+	ground_truth_combo_method = balanced3
+	predicted_combo = balanced4
+
+	balanced2 = (np.where(np.array(ground_truth_sales_method) == 0)[0])
+	balanced3 = (np.where(np.array(ground_truth_sales_method) != 0)[0])
+	balanced4 = np.random.choice(balanced2,balanced3.size,replace=False)
+	balanced2 = np.concatenate([balanced3,balanced4])
+	balanced3 = list(np.take(np.array(ground_truth_sales_method), balanced2))
+	balanced4 = list(np.take(np.array(predicted_sales), balanced2))
+	ground_truth_sales_method = balanced3
+	predicted_sales = balanced4
+	
+	print ((np.where(np.array(ground_truth_sales_method) == 0)[0]).size)
+	print ((np.where(np.array(ground_truth_sales_method) != 0)[0]).size)
+	print ((np.where(np.array(predicted_sales) == 0)[0]).size)
+	print ((np.where(np.array(predicted_sales) != 0)[0]).size)
+
+	balanced2 = (np.where(np.array(ground_truth_returns_method) == 0)[0])
+	balanced3 = (np.where(np.array(ground_truth_returns_method) != 0)[0])
+	balanced4 = np.random.choice(balanced2,balanced3.size,replace=False)
+	balanced2 = np.concatenate([balanced3,balanced4])
+	balanced3 = list(np.take(np.array(ground_truth_returns_method), balanced2))
+	balanced4 = list(np.take(np.array(predicted_returns), balanced2))
+	ground_truth_returns_method = balanced3
+	predicted_returns = balanced4
+
+	print ((np.where(np.array(ground_truth_returns_method) == 0)[0]).size)
+	print ((np.where(np.array(ground_truth_returns_method) != 0)[0]).size)
+	print ((np.where(np.array(predicted_returns) == 0)[0]).size)
+	print ((np.where(np.array(predicted_returns) != 0)[0]).size)
+
+	sales_model = svm.SVC()
+	predicted_sales = np.asarray(predicted_sales)
+	ground_truth_sales_method = np.asarray(ground_truth_sales_method)
+	predicted_sales = predicted_sales.reshape(-1,1)
+	sales_model.fit(predicted_sales,ground_truth_sales_method)
+	pickle.dump(sales_model,open("../"+vertical+"/sales/method_1/model.pickle","wb"))
+	
+	returns_model =  svm.SVC()
+	predicted_returns = np.asarray(predicted_returns)
+	ground_truth_returns_method = np.asarray(ground_truth_returns_method)
+	predicted_returns = predicted_returns.reshape(-1,1)
+	returns_model.fit(predicted_returns,ground_truth_returns_method)
+	pickle.dump(returns_model,open("../"+vertical+"/returns/method_1/model.pickle","wb"))
+
+	combo_model = svm.SVC()
+	predicted_combo = np.asarray(predicted_combo)
+	ground_truth_combo_method = np.asarray(ground_truth_combo_method)
+	combo_model.fit(predicted_combo,ground_truth_combo_method)
+	pickle.dump(combo_model,open("../"+vertical+"/combo_model.pickle","wb"))
+	
+	print "Models Learned...!!!!"
+
+	predicted_sales = []
+	predicted_returns = []
+	predicted_combo = []
+	for_combo = []
+	for_combo2 = []
+	ground_truth_sales_method = []
+	ground_truth_returns_method = []
+	ground_truth_combo_method = []
+	
+	ground_truth_returns = []
+
+	chunksize = 10 ** 3
+	for df in pd.read_csv(returns_testing_name, sep="\t",chunksize=chunksize):
+		for index,rows in df.iterrows():
+			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+				continue
+			ground_truth_returns.append((rows['order_item_id'],rows['brand'],rows['account_id'],rows[size_column_name]))
+
+	chunksize = 10 ** 3
+	for df in pd.read_csv(sales_testing_name, sep="\t",chunksize=chunksize):
+		for index,rows in df.iterrows():
+			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+				continue
+
+			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in sales_bs and sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_sales.keys():
+				clus = list(cluster_sales[sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower())])
+			else:
+				continue
+
+			if G_sales_bi_weighted.has_node(str(rows['account_id'])):
+				purchases  = G_sales_bi_weighted[rows['account_id']]
+			else:
+				continue
+			
+			if G_returns_bi_weighted.has_node(str(rows['account_id'])):
+				returns = G_returns_bi_weighted[rows['account_id']]
+				numerator = 0
+				denominator = 0
+				running_sum = 0
+				total_sold = 0
+				for items in clus:
+					if G_returns_bi_weighted.has_edge(str(rows['account_id']),sales_bs[items]):
+						numerator = G_returns_bi_weighted[str(rows['account_id'])][sales_bs[items]]['weight']
+						denominator = numerator
+					else:
+						numerator = 0
+					if G_sales_bi_weighted.has_edge(str(rows['account_id']),sales_bs[items]):
+						denominator = denominator + G_sales_bi_weighted[str(rows['account_id'])][sales_bs[items]]['weight']
+					elif denominator == 0:
+						continue
+					running_sum = float(running_sum) + ((float(numerator))/float(denominator))
+					total_sold = total_sold + 1
+				if total_sold > 0:
+					predicted_sales.append((float(running_sum))/float(total_sold))
+					for_combo.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+				else:
+					predicted_sales.append(0)
+					for_combo.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+			else:
+				predicted_sales.append(0)
+				for_combo.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+			
+			if (rows['order_id'],rows['brand'],rows['account_id'],rows[size_column_name]) in ground_truth_returns:
+				ground_truth_sales_method.append(1)
+			else:
+				ground_truth_sales_method.append(0)
+
+	print "Sales Done....!!!!!"
+
+	chunksize = 10 ** 3
+	for df in pd.read_csv(sales_testing_name, sep="\t",chunksize=chunksize):
+		for index,rows in df.iterrows():
+			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+				continue
+
+			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in returns_bs and returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_returns.keys():
+				clus = list(cluster_returns[returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower())])
+			else:
+				continue
+
+			if G_sales_bi_weighted.has_node(str(rows['account_id'])):
+				purchases  = G_sales_bi_weighted[rows['account_id']]
+			else:
+				continue
+			
+			if G_returns_bi_weighted.has_node(str(rows['account_id'])):
+				returns = G_returns_bi_weighted[rows['account_id']]
+				numerator = 0
+				denominator = 0
+				running_sum = 0
+				total_sold = 0
+				for items in clus:
+					if G_returns_bi_weighted.has_edge(str(rows['account_id']),returns_bs[items]):
+						numerator = G_returns_bi_weighted[str(rows['account_id'])][returns_bs[items]]['weight']
+						denominator = numerator
+					else:
+						numerator = 0
+					if G_sales_bi_weighted.has_edge(str(rows['account_id']),returns_bs[items]):
+						denominator = denominator + G_sales_bi_weighted[str(rows['account_id'])][returns_bs[items]]['weight']
+					elif denominator == 0:
+						continue
+					running_sum = float(running_sum) + ((float(numerator))/float(denominator))
+					total_sold = total_sold + 1
+				if total_sold > 0:
+					predicted_returns.append((float(running_sum))/float(total_sold))
+					for_combo2.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+				else:
+					predicted_returns.append(0)
+					for_combo2.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+			else:
+				predicted_returns.append(0)
+				for_combo2.append((str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id'])))
+			
+			if (rows['order_id'],rows['brand'],rows['account_id'],rows[size_column_name]) in ground_truth_returns:
+				ground_truth_returns_method.append(1)
+			else:
+				ground_truth_returns_method.append(0)
+	
+	chunksize = 10 ** 3
+	for df in pd.read_csv(sales_testing_name, sep="\t",chunksize=chunksize):
+		for index,rows in df.iterrows():
+			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+				continue
+			
+			temp_tuple = (str(rows['account_id']),str(rows['brand']).lower(),str(rows[size_column_name]).lower(),str(rows['order_id']))
+			if temp_tuple in for_combo and temp_tuple in for_combo2:
+				predicted_combo.append(list((predicted_sales[for_combo.index(temp_tuple)],predicted_returns[for_combo2.index(temp_tuple)])))
+				ground_truth_combo_method.append(ground_truth_sales_method[for_combo.index(temp_tuple)])
+	
+	predicted_sales = np.asarray(predicted_sales)
+	predicted_sales = predicted_sales.reshape(-1,1)
+	temp = sales_model.predict(predicted_sales)
+	ground_truth_sales_method = np.asarray(ground_truth_sales_method)
+	print ("For Sales only method...!!!!")
+	print "Accuracy:"+str(accuracy_score(ground_truth_sales_method,temp))
+	print "Precision:"+str(precision_score(ground_truth_sales_method,temp))
+	print "Recall:"+str(recall_score(ground_truth_sales_method,temp))
+	print "F1 Score:"+str(f1_score(ground_truth_sales_method,temp))
+	print "ROC AUC:"+str(roc_auc_score(ground_truth_sales_method,temp))
+	print ("\n")
+	
+	predicted_returns = np.asarray(predicted_returns)
+	predicted_returns = predicted_returns.reshape(-1,1)
+	temp = returns_model.predict(predicted_returns)
+	ground_truth_returns_method = np.asarray(ground_truth_returns_method)
+	print ("For Returns only method...!!!!")
+	print "Accuracy:"+str(accuracy_score(ground_truth_returns_method,temp))
+	print "Precision:"+str(precision_score(ground_truth_returns_method,temp))
+	print "Recall:"+str(recall_score(ground_truth_returns_method,temp))
+	print "F1 Score:"+str(f1_score(ground_truth_returns_method,temp))
+	print "ROC AUC:"+str(roc_auc_score(ground_truth_returns_method,temp))
+	print ("\n")
+	
+	predicted_combo = np.asarray(predicted_combo)
+	temp = combo_model.predict(predicted_combo)
+	ground_truth_combo_method = np.asarray(ground_truth_combo_method)
+	print ("For Combo method...!!!!")
+	print "Accuracy:"+str(accuracy_score(ground_truth_combo_method,temp))
+	print "Precision:"+str(precision_score(ground_truth_combo_method,temp))
+	print "Recall:"+str(recall_score(ground_truth_combo_method,temp))
+	print "F1 Score:"+str(f1_score(ground_truth_combo_method,temp))
+	print "ROC AUC:"+str(roc_auc_score(ground_truth_combo_method,temp))
+	
+	
+	
+	
+	
+			
