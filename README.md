@@ -44,6 +44,8 @@ Clustering (Brand,Size)s with standard community detection algorithms(Fastgreedy
 
 Clustering (Brand,Size)s with standard community detection algorithms(Fastgreedy,Infomap and Walktrap). Than compress those clusters with Random Walk with Restart(RWR). *Note:- Change the vertical names passed from main function accordingly.*
 
+-------
+
 ### Method-4
 
 Converting (Brand,Size) nodes into vectors using node2vec and subsequently applying k-means algorithm to get clusters of (Brand,Size) nodes. *Note:- Change the vertical names passed from main function accordingly.*
