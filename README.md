@@ -14,34 +14,39 @@ Product returns takes major hit on revenue for any Online Marketplace. So if we 
   - `netowrkx`
   - `sklearn`
   - `pickle`
+  - `igraph`
 
 -------
 
 #### cleaning.py
 
-For cleaning the dataset and dividing it into training,validation and testing set. 
+For cleaning the dataset and dividing it into training,validation and testing set. First run this file to obtain training, validation and test sets. *Note:- Change the vertical names passed from main function accordingly.* 
 
 #### persona_analysis.py
 
-For persona analysis of user to see if single user buys product from same vertical for other persons.
+For persona analysis of user to see if single user buys product from same vertical for other persons. *Note:- Change the vertical names passed from main function accordingly.*
 
 -------
 
 ### Method-1
 
-Clustering (Brand,Size)s with Random Walk with Restart(RWR).
+Clustering (Brand,Size)s with Random Walk with Restart(RWR). *Note:- Change the vertical names passed from main function accordingly.*
 
 -------
 
 ### Method-2
 
-Clustering (Brand,Size)s with standard community detection algorithms(Fastgreedy,Infomap and Walktrap).
+Clustering (Brand,Size)s with standard community detection algorithms(Fastgreedy,Infomap and Walktrap). *Note:- Change the vertical names passed from main function accordingly.*
 
 ------
 
 ### Method-3
 
-Clustering (Brand,Size)s with standard community detection algorithms(Fastgreedy,Infomap and Walktrap). Than compress those clusters with Random Walk with Restart(RWR).
+Clustering (Brand,Size)s with standard community detection algorithms(Fastgreedy,Infomap and Walktrap). Than compress those clusters with Random Walk with Restart(RWR). *Note:- Change the vertical names passed from main function accordingly.*
+
+### Method-4
+
+Converting (Brand,Size) nodes into vectors using node2vec and subsequently applying k-means algorithm to get clusters of (Brand,Size) nodes. *Note:- Change the vertical names passed from main function accordingly.*
 
 -------
 
