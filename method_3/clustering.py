@@ -42,6 +42,7 @@ def clustering(vertical):
 	
 	os.system("python2.6 helper.py "+str(vertical))
 	
+	"""
 	for method in ["fastgreedy","walktrap","infomap"]:
 		for both in ["sales","returns"]:
 			print "Now running RWR on "+str(vertical)+" "+str(both)+" "+str(method)+"."
@@ -113,6 +114,66 @@ def clustering(vertical):
 			pickle.dump(clusters_dic,open("../../data/"+str(vertical)+"/results/method_3/"+str(method)+"/"+str(both)+"/"+str(both)+"_clusters.pickle","w"))
 			if os.path.exists("temp_edgelist.txt"):
 					os.remove("temp_edgelist.txt")
+			print "Done." """
+	
+	for method in ["fastgreedy","infomap","walktrap"]:
+		for both in ["sales","returns"]:
+			print "Now running RWR on "+str(vertical)+" "+str(both)+" "+str(method)+"."
+			G=nx.read_gpickle("../../data/"+str(vertical)+"/"+str(both)+"/pickles/"+str(vertical)+"_"+str(both)+"_training_pro.pickle")
+			bs = list(pickle.load(open("../../data/"+str(vertical)+"/"+str(both)+"/pickles/"+str(vertical)+"_"+str(both)+"_training_bs.pickle","r")))
+			bs.sort()
+			
+			clusters = []
+			
+			with open("../../data/"+str(vertical)+"/results/method_3/"+str(method)+"/"+str(both)+"/clusters.txt","r") as f:
+				content = f.readlines()
+				for lines in content:
+					clusters.append(map(int,(lines.split("\t"))[:-1]))
+			
+			clusters_dic = {}
+			
+			graphs = list(nx.connected_component_subgraphs(G))
+			d = 1
+			for gs in graphs:
+				d = max(d,nx.diameter(gs))
+			
+			cr = (1-float(0.045**(1/float(d))))
+			
+			for cluster in clusters:
+				if len(cluster) == 1:
+					clusters_dic[cluster[0]] = []
+					continue
+				
+				for vertex in cluster:
+					clusters_dic[vertex] = []
+				
+				for seed in cluster:
+					if os.path.exists("seed.txt"):
+						os.remove("seed.txt")
+					os.system("echo "+str(seed)+" > seed.txt")
+					most_similar = subprocess.check_output(["python", "lib/run_walker.py" , "../../data/"+str(vertical)+"/"+str(both)+"/data/"+str(vertical)+"_"+str(both)+"_training_edgelist.txt" , "seed.txt"])
+					most_similar = most_similar.split("\n")[1:-1]
+					os.system("rm seed.txt")
+					
+					for lines in most_similar:
+						if float(lines.split("\t")[1]) > 0.0:
+							clusters_dic[seed].append((int(lines.split("\t")[0]),float(lines.split("\t")[1])))
+						else:
+							break
+					
+					if len(clusters_dic[seed]) == 0:
+						clusters_dic.pop(seed)
+						continue
+					
+					mean = float(float(sum(x[1] for x in clusters_dic[seed]))/float(len(clusters_dic[seed])))
+					temp_list = [i[0] for i in clusters_dic[seed] if i[1] >= mean]
+					temp_list = temp_list[:50]
+					temp_list = list(set(temp_list).intersection(set(cluster)))
+					clusters_dic[seed] = temp_list
+			
+			print str(len(clusters_dic.keys()))+" BSs were clustered."
+			pickle.dump(clusters_dic,open("../../data/"+str(vertical)+"/results/method_3/"+str(method)+"/"+str(both)+"/"+str(both)+"_clusters.pickle","w"))
+			
 			print "Done."
 
 def evaluation(vertical,flag):
@@ -178,7 +239,7 @@ def evaluation(vertical,flag):
 			
 			total_not_null_sales += 1
 			
-			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in sales_bs and sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_sales.keys() :
+			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in sales_bs and sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_sales :
 				clus = list(cluster_sales[sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower())])
 				clus.append(sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()))
 			else:
@@ -238,7 +299,7 @@ def evaluation(vertical,flag):
 				continue
 			
 			total_not_null_returns += 1
-			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in returns_bs and returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_returns.keys():
+			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in returns_bs and returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_returns:
 				clus = list(cluster_returns[returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower())])
 				clus.append(returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()))
 			else:
@@ -383,7 +444,7 @@ def evaluation(vertical,flag):
 			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
 				continue
 			
-			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in sales_bs and sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_sales.keys():
+			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in sales_bs and sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_sales:
 				clus = list(cluster_sales[sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower())])
 				clus.append(sales_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()))
 			else:
@@ -432,7 +493,7 @@ def evaluation(vertical,flag):
 			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
 				continue
 			
-			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in returns_bs and returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_returns.keys():
+			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in returns_bs and returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in cluster_returns:
 				clus = list(cluster_returns[returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower())])
 				clus.append(returns_bs.index((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()))
 			else:
@@ -554,12 +615,12 @@ def evaluation(vertical,flag):
 	eval_file.close()
 
 def main():
-	verticals = ["womenjean","mencasualshirt"]
+	verticals = ["womenjean","mencasualshirt","menpolotshirt","mencasaulshoes"]
 	for vertical in verticals:
 		clustering(vertical)
-		evaluation(vertical,0)
-		evaluation(vertical,1)
-		evaluation(vertical,2)
+		#evaluation(vertical,0)
+		#evaluation(vertical,1)
+		#evaluation(vertical,2)
 
 if __name__ == '__main__':
 	main()

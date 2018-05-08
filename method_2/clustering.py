@@ -113,13 +113,13 @@ def evaluation(vertical,flag):
 	chunksize = 1000
 	for df in pd.read_csv(returns_validation_name, sep="\t",chunksize=chunksize):
 		for index,rows in df.iterrows():
-			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+			if str(rows['brand']).lower() == 'nan' or str(rows[size_column_name]).lower() == 'nan':
 				continue
 			ground_truth_returns.append((rows['order_item_id'],rows['brand'],rows['account_id'],rows[size_column_name]))
 	
 	for df in pd.read_csv(sales_validation_name, sep="\t",chunksize=chunksize):
 		for index,rows in df.iterrows():
-			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+			if str(rows['brand']).lower() == 'nan' or str(rows[size_column_name]).lower() == 'nan':
 				continue
 			
 			total_not_null_sales += 1
@@ -176,7 +176,7 @@ def evaluation(vertical,flag):
 	
 	for df in pd.read_csv(sales_validation_name, sep="\t",chunksize=chunksize):
 		for index,rows in df.iterrows():
-			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+			if str(rows['brand']).lower() == 'nan' or str(rows[size_column_name]).lower() == 'nan':
 				continue
 			
 			total_not_null_returns += 1
@@ -319,13 +319,13 @@ def evaluation(vertical,flag):
 	
 	for df in pd.read_csv(returns_testing_name, sep="\t",chunksize=chunksize):
 		for index,rows in df.iterrows():
-			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+			if str(rows['brand']).lower() == 'nan' or str(rows[size_column_name]).lower() == 'nan':
 				continue
 			ground_truth_returns.append((rows['order_item_id'],rows['brand'],rows['account_id'],rows[size_column_name]))
 	
 	for df in pd.read_csv(sales_testing_name, sep="\t",chunksize=chunksize):
 		for index,rows in df.iterrows():
-			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+			if str(rows['brand']).lower() == 'nan' or str(rows[size_column_name]).lower() == 'nan':
 				continue
 			
 			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in sales_bs and (str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower() in cluster_sales_flat:
@@ -373,7 +373,7 @@ def evaluation(vertical,flag):
 	
 	for df in pd.read_csv(sales_testing_name, sep="\t",chunksize=chunksize):
 		for index,rows in df.iterrows():
-			if str(rows['brand']).lower() == 'null' or str(rows[size_column_name]).lower() == 'null':
+			if str(rows['brand']).lower() == 'nan' or str(rows[size_column_name]).lower() == 'nan':
 				continue
 			
 			if ((str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower()) in returns_bs and (str(rows['brand']).lower()).replace(" ","_")+";"+str(rows[size_column_name]).lower() in cluster_returns_flat:
@@ -497,12 +497,12 @@ def evaluation(vertical,flag):
 	eval_file.close()
 
 def main():
-	verticals = ["womenjean","mencasualshirt"]
+	verticals = ["menpolotshirt"]
 	for vertical in verticals:
 		clustering(vertical)
 		evaluation(vertical,0)
-		evaluation(vertical,1)
-		evaluation(vertical,2)
+		#evaluation(vertical,1)
+		#evaluation(vertical,2)
 
 if __name__ == '__main__':
 	main()
